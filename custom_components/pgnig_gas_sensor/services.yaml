@@ -2,3 +2,21 @@ refresh:
   name: Refresh
   description: Force refresh all sensor data for this integration.
   fields: {}
+
+load_billing_history:
+  name: Load billing history year
+  description: Download a selected year once using the existing session. No login retries. History is stored locally; live invoice totals are unchanged.
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          integration: pgnig_gas_sensor
+          domain: sensor
+    year:
+      required: true
+      selector:
+        number:
+          min: 2000
+          max: 2100
+          mode: box

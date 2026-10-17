@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DEFAULT_AUTH_METHOD, DOMAIN
 from .billing_history import billing_history
+from .history_archive import merge_rows, ARCHIVE_LIMIT
 from .coordinator import PgnigCoordinator, PgnigData
 from .Invoices import InvoicesList
 from .PgnigApi import PgnigApi
@@ -260,7 +261,11 @@ class PgnigCostTrackingSensor(PgnigBaseSensor):
         attrs = dict()
         data = self.coordinator.data
         attrs["billing_history"] = billing_history(data.invoices, self.id_local) if data else []
-        attrs["billing_history_limit"] = 12
+        archive = getattr(self.coordinator, "billing_archive", None)
+        if archive is not None:
+            attrs["billing_history"] = merge_rows(attrs["billing_history"], archive.rows(self.id_local))
+            attrs.update(archive.metadata())
+        attrs["billing_history_limit"] = ARCHIVE_LIMIT if archive is not None else 12
         attrs["billing_history_source"] = "invoice_periods"
         if self._state is not None:
             attrs["last_invoice_date"] = self._state.paying_deadline_date

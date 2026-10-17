@@ -122,6 +122,19 @@ class PgnigApi:
         resp = self._get_authenticated(invoices_url, "Invoices")
         return invoices_from_dict(resp.json())
 
+    def invoice_page(self, page: int) -> Invoices:
+        """Explicit archive read: use cached authentication, never login/retry."""
+        if isinstance(page, bool) or not isinstance(page, int) or not 1 <= page <= 30:
+            raise ValueError("Invalid invoice page")
+        token = self._auth.cached_token
+        if not token:
+            raise SessionExpiredError("No existing session for archive download")
+        url = invoices_url.replace("pageNumber=1&", f"pageNumber={page}&")
+        response = self._auth.session.get(url, headers=self._api_headers(token), timeout=30)
+        if not response.ok:
+            raise RuntimeError(f"History request failed ({response.status_code}); no retry")
+        return invoices_from_dict(response.json())
+
     def login(self, *, allow_interactive: bool = False) -> str:
         with self._login_lock:
             _LOGGER.debug(

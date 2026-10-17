@@ -11,7 +11,12 @@ from homeassistant.config_entries import SOURCE_IMPORT
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.exceptions import HomeAssistantError
+from datetime import datetime, timezone
+
+from .history_archive import BillingArchive
 
 from .auth.exceptions import AuthError
 from .const import (
@@ -43,6 +48,24 @@ async def async_setup(hass, config):
                 DOMAIN, context={"source": SOURCE_IMPORT}, data=config[DOMAIN]
             )
         )
+    async def load_billing_history(call):
+        entity = er.async_get(hass).async_get(call.data["entity_id"])
+        if entity is None or entity.platform != DOMAIN:
+            raise HomeAssistantError("Choose an entity of this gas integration")
+        runtime = hass.data[DOMAIN].get(entity.config_entry_id)
+        if runtime is None:
+            raise HomeAssistantError("Gas integration is unavailable")
+        year = call.data["year"]
+        if not 2000 <= year <= datetime.now(timezone.utc).year:
+            raise HomeAssistantError("Invalid history year")
+        try:
+            await runtime.coordinator.billing_archive.async_request(year)
+        except ValueError as err:
+            raise HomeAssistantError(str(err)) from err
+
+    hass.services.async_register(DOMAIN, "load_billing_history", load_billing_history,
+        schema=vol.Schema({vol.Required("entity_id"): cv.entity_id,
+                           vol.Required("year"): vol.All(vol.Coerce(int), vol.Range(min=2000, max=2100))}))
     return True
 
 
@@ -122,6 +145,10 @@ async def _async_build_runtime_data(
         raise ConfigEntryNotReady(f"Could not reach Orlen EBOK: {err}") from err
 
     coordinator = PgnigCoordinator(hass, config_entry, api, meters)
+    archive = BillingArchive(hass, config_entry.entry_id, api, meters,
+        coordinator.async_update_listeners)
+    await archive.async_restore()
+    coordinator.billing_archive = archive
     await coordinator.async_config_entry_first_refresh()
     return PgnigRuntimeData(api=api, meters=meters, coordinator=coordinator)
 
