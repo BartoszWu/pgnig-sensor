@@ -1,7 +1,7 @@
 # Invoice-period history extension
 
 This branch is based on upstream v3.1.7 and identifies itself as
-`3.1.7+history.1`. It is a local extension, not an upstream stable release.
+`3.1.7+history.2`. It is a local extension, not an upstream stable release.
 
 The cost sensor exposes `billing_history`: up to 12 documents from the invoice
 list the existing coordinator has already fetched. The API's first page is
@@ -34,6 +34,33 @@ Installation uses the usual `custom_components/pgnig_gas_sensor` directory.
 Back up the current directory before changing it, check HA configuration and
 restart HA to load the changed Python module. Revert the copied files from that
 backup and restart to roll back. No config entry or historical entity is removed.
-HACS still tracks upstream; installing an upstream update can overwrite this
-extension. Review the file diff before updating; do not claim it is maintained
-by the upstream author until merged there.
+HACS can track the personal fork BartoszWu/pgnig-sensor. This is not an upstream release. Upstream changes need review before merging into this fork.
+
+
+## On-demand years
+
+`pgnig_gas_sensor.load_billing_history` takes `entity_id` (an entity of the
+configured integration) and `year` (2000 through the current year). It starts
+one background download, using only the authenticated session already held
+in memory. It never invokes login, session renewal or a retry. A failed request
+ends the download; no response bodies or credentials are logged or exposed.
+Only one archive job per entry can run at a time.
+
+The endpoint's existing pageNumber/pageSize parameters are used sequentially,
+12 documents per page, at most 30 pages, with a one-second gap. Empty/short or
+repeated pages end traversal. The API may retain less than the full requested
+year; reaching the end is not a claim of complete calendar coverage. Missing
+historical years are represented as no data, not zeros. The current eight-hour
+poll is unchanged and never re-downloads the archive.
+
+Only safe projections for the selected year, keyed by period END year, are
+persisted with HA's Store outside Git, along with page/availability metadata.
+The latest-page projection is merged with this archive (maximum 360 records).
+Distinct identical documents within one projection remain distinct. Archived
+rows never enter the current invoice list, balance, cost or Energy statistics.
+Already requested years are served from local storage, including empty results.
+
+Additional cost sensor attributes: `billing_history_loaded_years`,
+`billing_history_archive_status` (idle/loading/ready/cached/limited/error),
+`billing_history_archive_error` (safe code), `billing_history_year_results`.
+The dashboard offers explicit download and independent year visibility.
