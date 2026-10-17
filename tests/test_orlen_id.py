@@ -173,9 +173,9 @@ def test_login_non_interactive_mfa_enabled_blocks(auth):
 def test_login_non_interactive_mfa_disabled_proceeds(auth):
     auth._mfa_enabled = False
     with patch.object(auth, "_try_restore_session_token", return_value=None):
-        with patch.object(auth, "_init_session") as mock_init:
-            # It should proceed to initialize session and try to login
-            with pytest.raises(RuntimeError):  # It will fail later in the flow due to no mock setup
+        with patch.object(auth, "_init_session", side_effect=RuntimeError("stop at init")) as mock_init:
+            # Stop at the tested boundary; never reach a real login endpoint.
+            with pytest.raises(RuntimeError, match="stop at init"):
                 auth.login(allow_interactive=False)
             mock_init.assert_called_once()
 

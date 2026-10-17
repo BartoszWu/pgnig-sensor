@@ -98,7 +98,8 @@ async def test_invoice_sensor_without_invoices(hass: HomeAssistant):
 async def test_cost_sensor_without_invoices(hass: HomeAssistant):
     sensor = PgnigCostTrackingSensor(build_stub_coordinator(hass), "M1", 1)
     assert sensor.state is None
-    assert sensor.extra_state_attributes == {}
+    assert sensor.extra_state_attributes["billing_history"] == []
+    assert sensor.extra_state_attributes["billing_history_source"] == "invoice_periods"
 
 
 # --- filtering ---------------------------------------------------------
