@@ -20,6 +20,7 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DEFAULT_AUTH_METHOD, DOMAIN
+from .billing_history import billing_history
 from .coordinator import PgnigCoordinator, PgnigData
 from .Invoices import InvoicesList
 from .PgnigApi import PgnigApi
@@ -257,10 +258,16 @@ class PgnigCostTrackingSensor(PgnigBaseSensor):
     @property
     def extra_state_attributes(self):
         attrs = dict()
+        data = self.coordinator.data
+        attrs["billing_history"] = billing_history(data.invoices, self.id_local) if data else []
+        attrs["billing_history_limit"] = 12
+        attrs["billing_history_source"] = "invoice_periods"
         if self._state is not None:
             attrs["last_invoice_date"] = self._state.paying_deadline_date
             attrs["last_invoice_gross_amount"] = self._state.gross_amount
             attrs["last_invoice_wear_m3"] = self._state.wear_m3
             attrs["last_invoice_wear_KWH"] = self._state.wear_kwh
             attrs["last_invoice_number"] = self._state.number
+            attrs["last_invoice_period_start"] = self._state.start_date.date().isoformat()
+            attrs["last_invoice_period_end"] = self._state.end_date.date().isoformat()
         return attrs
